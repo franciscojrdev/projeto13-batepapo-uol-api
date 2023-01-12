@@ -2,10 +2,21 @@ import express from "express";
 import dotenv from "dotenv";
 import { MongoClient } from "mongodb";
 import dayjs from "dayjs";
+import Joi from "joi";
 
 const app = express();
 dotenv.config();
 app.use(express.json());
+
+const userSchema = Joi.object({
+  name: Joi.string().min(3).max(30).required()
+})
+
+const messageSchema = Joi.object({
+  to: Joi.string().min(3).max(30).required(),
+  text: Joi.string().min(3).required(),
+  type: Joi.string().required().valid("message","private_message")
+})
 
 // console.log(dayjs().format("hh:mm:ss"));
 
@@ -21,8 +32,12 @@ try {
 const db = mongoClient.db("uoldb");
 
 app.post("/participants", async (req, res) => {
+  const { name } = req.body;
+  
   try {
-    const { name } = req.body;
+
+    await userSchema.validateAsync({ name })
+    
     const findUser = await db.collection("participants").findOne({ name });
 
     if (findUser) {
@@ -61,13 +76,33 @@ app.post("/messages", async (req,res) =>{
   const {to,text,type} = req.body
   const {User} = req.headers
   try {
+    await messageSchema.validateAsync({to,text,type})
+    const findParticipant =  db.collection("participants").findOne({name:User})
+    if(!findParticipant){
+      return res.status(422).send("Usuário não encontrado!")
+    }
+    await db.collection("messages").insertOne({
+      from: User,
+      to: to,
+      text: text,
+      type: type,
+      time: dayjs().format("hh:mm:ss")
+    });
+    res.sendStatus(201)
+  } catch (error) {
+    res.status(422).send(error.message)
+  }
+});
+
+app.get("/messages", async (req,res)=>{
+  const {limit} = req.query
+
+  try {
     
   } catch (error) {
     
   }
 });
-
-app.get("/messages");
 
 app.post("/status");
 
