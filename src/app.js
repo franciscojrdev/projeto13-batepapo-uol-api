@@ -33,26 +33,39 @@ app.post("/participants", async (req, res) => {
       lastStatus: Date.now(),
     });
 
-    await db
-      .collection("messages")
-      .insertOne({
-        from: name,
-        to: "Todos",
-        text: "entra na sala...",
-        type: "status",
-        time: dayjs().format("hh:mm:ss")
-      });
-      res.sendStatus(201)
+    await db.collection("messages").insertOne({
+      from: name,
+      to: "Todos",
+      text: "entra na sala...",
+      type: "status",
+      time: dayjs().format("hh:mm:ss"),
+    });
 
-  } catch (err) {
-    res.status(422).send(err.message);
-    return
+    return res.sendStatus(201);
+  } catch (error) {
+    res.status(422).send(error.message);
+    return;
   }
 });
 
-app.get("/participants");
+app.get("/participants", async (req, res) => {
+  try {
+    const showParticipants = await db.collection("participants").find().toArray();
+    return res.status(201).send(showParticipants);
+  } catch (error) {
+    return res.status(422).send(error.message);
+  }
+});
 
-app.post("/messages");
+app.post("/messages", async (req,res) =>{
+  const {to,text,type} = req.body
+  const {User} = req.headers
+  try {
+    
+  } catch (error) {
+    
+  }
+});
 
 app.get("/messages");
 
