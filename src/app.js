@@ -9,14 +9,14 @@ dotenv.config();
 app.use(express.json());
 
 const userSchema = Joi.object({
-  name: Joi.string().min(3).max(30).required()
-})
+  name: Joi.string().min(3).max(30).required(),
+});
 
 const messageSchema = Joi.object({
   to: Joi.string().min(3).max(30).required(),
   text: Joi.string().min(3).required(),
-  type: Joi.string().required().valid("message","private_message")
-})
+  type: Joi.string().required().valid("message", "private_message"),
+});
 
 // console.log(dayjs().format("hh:mm:ss"));
 
@@ -33,11 +33,10 @@ const db = mongoClient.db("uoldb");
 
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
-  
-  try {
 
-    await userSchema.validateAsync({ name })
-    
+  try {
+    await userSchema.validateAsync({ name });
+
     const findUser = await db.collection("participants").findOne({ name });
 
     if (findUser) {
@@ -65,21 +64,27 @@ app.post("/participants", async (req, res) => {
 
 app.get("/participants", async (req, res) => {
   try {
-    const showParticipants = await db.collection("participants").find().toArray();
+    const showParticipants = await db
+      .collection("participants")
+      .find()
+      .toArray();
     return res.status(201).send(showParticipants);
   } catch (error) {
     return res.status(422).send(error.message);
   }
 });
 
-app.post("/messages", async (req,res) =>{
-  const {to,text,type} = req.body
-  const {User} = req.headers
+app.post("/messages", async (req, res) => {
+  const { to, text, type } = req.body;
+  const { User } = req.headers;
   try {
-    await messageSchema.validateAsync({to,text,type})
-    const findParticipant =  db.collection("participants").findOne({name:User})
-    if(!findParticipant){
-      return res.status(422).send("Usuário não encontrado!")
+    await messageSchema.validateAsync({ to, text, type });
+    const findParticipant = db
+      .collection("participants")
+      .findOne({ name: User });
+    
+      if (!findParticipant) {
+      return res.status(422).send("Usuário não encontrado!");
     }
     await db.collection("messages").insertOne({
       from: User,
@@ -88,19 +93,29 @@ app.post("/messages", async (req,res) =>{
       type: type,
       time: dayjs().format("hh:mm:ss")
     });
-    res.sendStatus(201)
+    res.sendStatus(201);
   } catch (error) {
-    res.status(422).send(error.message)
+    res.status(422).send(error.message);
   }
 });
 
-app.get("/messages", async (req,res)=>{
-  const {limit} = req.query
+app.get("/messages", async (req, res) => {
+  const { limit } = req.query;
+  const { User } = req.headers;
 
   try {
-    
+    const findMessages = await db
+      .collection("messages")
+      .find({ $or: [{ from: User }, { to: User }] })
+      .toArray();
+
+    if (limit) {
+      console.log("Está entrando aqui hem");
+      return res.status(201).send([...findMessages].reverse().slice(-limit));
+    }
+    res.status(201).send(findMessages)
   } catch (error) {
-    
+    res.status(422).send(error.message)
   }
 });
 
