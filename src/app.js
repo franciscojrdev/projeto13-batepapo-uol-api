@@ -42,6 +42,8 @@ app.post("/participants", async (req, res) => {
 
     const findUser = await db.collection("participants").findOne({ name });
 
+    console.log(findUser)
+
     if (findUser) {
       return res.status(409).send({ message: "Usuário já existente!" });
     }
@@ -79,18 +81,18 @@ app.get("/participants", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
   const { to, text, type } = req.body;
-  const { User } = req.headers;
+  const { user } = req.headers; 
   try {
     await messageSchema.validateAsync({ to, text, type });
     const findUser = await db
       .collection("participants")
-      .findOne({ name:User })
+      .findOne({ name:user })
     console.log(findUser);
     if (!findUser) {
       return res.status(422).send("Usuário não encontrado!");
     }
     await db.collection("messages").insertOne({
-      from: User,
+      from: user,
       to: to,
       text: text,
       type: type,
@@ -104,19 +106,19 @@ app.post("/messages", async (req, res) => {
 
 app.get("/messages", async (req, res) => {
   const { limit } = req.query;
-  const { User } = req.headers;
+  const { user } = req.headers;
 
   try {
     const findMessages = await db
       .collection("messages")
-      .find({ $or: [{ from: User }, { to: User }] })
+      .find({ $or: [{ from: user }, { to: user }] })
       .toArray();
-
+    console.log(findMessages)
     if (limit && limit > 0) {
       console.log("Está entrando aqui hem");
       return res.status(201).send([...findMessages].reverse().slice(-limit));
     }
-    res.status(201).send(findMessages);
+    res.status(201).send([...findMessages].reverse());
   } catch (error) {
     res.status(422).send(error.message);
   }
@@ -124,7 +126,7 @@ app.get("/messages", async (req, res) => {
 
 app.delete("/messages/:id", async (req, res) => {
   const { id } = req.params;
-  const { User } = req.headers;
+  const { user } = req.headers;
   try {
     const findMessage = await db
       .collection("messages")
@@ -132,7 +134,7 @@ app.delete("/messages/:id", async (req, res) => {
     if (!findMessage) {
       return res.status(404).send("Mensagem não existe!");
     }
-    if (findMessage.from !== User) {
+    if (findMessage.from !== user) {
       return res.sendStatus(401);
     }
     await db.collection("messages").deleteOne({ _id: ObjectId(id) });
@@ -144,16 +146,16 @@ app.delete("/messages/:id", async (req, res) => {
 });
 
 app.post("/status", async (req, res) => {
-  const { User } = req.headers;
+  const { user } = req.headers;
   try {
-    let findUser = await db.collection("participants").findOne({ name: User });
+    let findUser = await db.collection("participants").findOne({ name: user });
     console.log(findUser);
     if (!findUser) {
       return res.status(404).send("User not found!");
     }
     await db
       .collection("participants")
-      .update({ name: User }, { $set: { lastStatus: Date.now() } });
+      .updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
     res.sendStatus(200);
   } catch (error) {
     console.log(error);
