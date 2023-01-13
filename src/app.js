@@ -42,8 +42,6 @@ app.post("/participants", async (req, res) => {
 
     const findUser = await db.collection("participants").findOne({ name });
 
-    console.log(findUser)
-
     if (findUser) {
       return res.status(409).send({ message: "Usuário já existente!" });
     }
@@ -81,12 +79,12 @@ app.get("/participants", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
   const { to, text, type } = req.body;
-  const { user } = req.headers; 
+  const { user } = req.headers;
   try {
     await messageSchema.validateAsync({ to, text, type });
     const findUser = await db
       .collection("participants")
-      .findOne({ name:user })
+      .findOne({ name: user });
     console.log(findUser);
     if (!findUser) {
       return res.status(422).send("Usuário não encontrado!");
@@ -108,13 +106,16 @@ app.get("/messages", async (req, res) => {
   const { limit } = req.query;
   const { user } = req.headers;
 
+  if (limit < 1 || Number(limit) === NaN) {
+    return res.status(422).send("Limite inválido");
+  }
   try {
     const findMessages = await db
       .collection("messages")
-      .find({ $or: [{ from: user }, { to: user }] })
+      .find({ $or: [{ from: user }, { to: user }, { type: "message" }] })
       .toArray();
-    console.log(findMessages)
-    if (limit && limit > 0) {
+    console.log(findMessages);
+    if (limit) {
       console.log("Está entrando aqui hem");
       return res.status(201).send([...findMessages].reverse().slice(-limit));
     }
@@ -162,6 +163,30 @@ app.post("/status", async (req, res) => {
     res.status(404).send("erro veio do catch");
   }
 });
+
+try {
+  setInterval(async () => {
+
+    let dados = await db.collection("participants").find().toArray();
+    console.log("entrou aqui",dados);
+    dados.forEach(el=>{
+      let timeNow  = Date.now()
+      let name = el.name
+      if(timeNow - el.lastStatus > 10){
+        db.collection("participants").deleteOne({name:name})
+        db.collection("messages").insertOne({
+          from: name,
+          to: "Todos",
+          text: "sai na sala...",
+          type: "status",
+          time: dayjs().format("hh:mm:ss"),
+        });
+      }
+    })
+  }, 15000);
+} catch (error) {
+  console.log(error);
+}
 
 app.listen(5000, () => {
   console.log(`Server running in port 5000`);
