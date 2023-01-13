@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dayjs from "dayjs";
 import Joi from "joi";
 
@@ -19,17 +19,20 @@ const messageSchema = Joi.object({
 });
 
 // console.log(dayjs().format("hh:mm:ss"));
+//objectid para pegar o id no banco de dados
 
 const mongoClient = new MongoClient(process.env.DATABASE_URL);
 
+let db;
+
 try {
   await mongoClient.connect();
+  db = mongoClient.db();
   console.log("MongoDB Connected!");
 } catch (err) {
   console.log(err.message);
 }
-
-const db = mongoClient.db("uoldb");
+//tirar a port e tirar o nome do banco daqui
 
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
@@ -79,11 +82,11 @@ app.post("/messages", async (req, res) => {
   const { User } = req.headers;
   try {
     await messageSchema.validateAsync({ to, text, type });
-    const findParticipant = db
+    const findUser = await db
       .collection("participants")
-      .findOne({ name: User });
-    
-      if (!findParticipant) {
+      .findOne({ name:User })
+    console.log(findUser);
+    if (!findUser) {
       return res.status(422).send("Usuário não encontrado!");
     }
     await db.collection("messages").insertOne({
@@ -91,7 +94,7 @@ app.post("/messages", async (req, res) => {
       to: to,
       text: text,
       type: type,
-      time: dayjs().format("hh:mm:ss")
+      time: dayjs().format("hh:mm:ss"),
     });
     res.sendStatus(201);
   } catch (error) {
@@ -109,18 +112,55 @@ app.get("/messages", async (req, res) => {
       .find({ $or: [{ from: User }, { to: User }] })
       .toArray();
 
-    if (limit) {
+    if (limit && limit > 0) {
       console.log("Está entrando aqui hem");
       return res.status(201).send([...findMessages].reverse().slice(-limit));
     }
-    res.status(201).send(findMessages)
+    res.status(201).send(findMessages);
   } catch (error) {
-    res.status(422).send(error.message)
+    res.status(422).send(error.message);
   }
 });
 
-app.post("/status");
+app.delete("/messages/:id", async (req, res) => {
+  const { id } = req.params;
+  const { User } = req.headers;
+  try {
+    const findMessage = await db
+      .collection("messages")
+      .findOne({ _id: ObjectId(id) });
+    if (!findMessage) {
+      return res.status(404).send("Mensagem não existe!");
+    }
+    if (findMessage.from !== User) {
+      return res.sendStatus(401);
+    }
+    await db.collection("messages").deleteOne({ _id: ObjectId(id) });
+    res.sendStatus(201);
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(404);
+  }
+});
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server running in port ${process.env.PORT}`);
+app.post("/status", async (req, res) => {
+  const { User } = req.headers;
+  try {
+    let findUser = await db.collection("participants").findOne({ name: User });
+    console.log(findUser);
+    if (!findUser) {
+      return res.status(404).send("User not found!");
+    }
+    await db
+      .collection("participants")
+      .update({ name: User }, { $set: { lastStatus: Date.now() } });
+    res.sendStatus(200);
+  } catch (error) {
+    console.log(error);
+    res.status(404).send("erro veio do catch");
+  }
+});
+
+app.listen(5000, () => {
+  console.log(`Server running in port 5000`);
 });
