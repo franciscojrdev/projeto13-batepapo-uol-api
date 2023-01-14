@@ -115,6 +115,11 @@ app.get("/messages", async (req, res) => {
       .find({ $or: [{ from: user }, { to: user }, { type: "message" }] })
       .toArray();
     console.log(findMessages);
+    if (!findMessages){
+      return res.send(40)
+    }
+
+
     if (limit) {
       console.log("Está entrando aqui hem");
       return res.status(201).send([...findMessages].reverse().slice(-limit));
@@ -124,6 +129,24 @@ app.get("/messages", async (req, res) => {
     res.status(422).send(error.message);
   }
 });
+
+app.put(("/messages/:id" async(req,res)=>{
+  const {user} = req.headers
+  const {to,text,type} = req.body
+  const {id} = req.params
+  try{
+    const findUser = await db.collection("participants").findOne({name:user})
+
+    if(!findUser){
+      return res.sendStatus(401)
+    }
+    await messageSchema.validateAsync({to,text,type})
+
+
+  }catch(error){
+    res.send()
+  }
+}))
 
 app.delete("/messages/:id", async (req, res) => {
   const { id } = req.params;
@@ -160,33 +183,33 @@ app.post("/status", async (req, res) => {
     res.sendStatus(200);
   } catch (error) {
     console.log(error);
-    res.status(404).send("erro veio do catch");
+    res.status(404).send(error.message);
   }
 });
 
-try {
-  setInterval(async () => {
+// try {
+//   setInterval(async () => {
 
-    let dados = await db.collection("participants").find().toArray();
-    console.log("entrou aqui",dados);
-    dados.forEach(el=>{
-      let timeNow  = Date.now()
-      let name = el.name
-      if(timeNow - el.lastStatus > 10){
-        db.collection("participants").deleteOne({name:name})
-        db.collection("messages").insertOne({
-          from: name,
-          to: "Todos",
-          text: "sai na sala...",
-          type: "status",
-          time: dayjs().format("hh:mm:ss"),
-        });
-      }
-    })
-  }, 15000);
-} catch (error) {
-  console.log(error);
-}
+//     let dados = await db.collection("participants").find().toArray();
+//     console.log("entrou aqui",dados);
+//     dados.forEach(async el=>{
+//       let timeNow  = Date.now()
+//       let name = el.name
+//       if(timeNow - el.lastStatus > 10){
+//         await db.collection("participants").deleteOne({name:name})
+//         await db.collection("messages").insertOne({
+//           from: name,
+//           to: "Todos",
+//           text: "sai na sala...",
+//           type: "status",
+//           time: dayjs().format("hh:mm:ss"),
+//         });
+//       }
+//     })
+//   }, 15000);
+// } catch (error) {
+//   console.log(error);
+// }
 
 app.listen(5000, () => {
   console.log(`Server running in port 5000`);
