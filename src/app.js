@@ -121,7 +121,8 @@ app.get("/messages", async (req, res) => {
         $or: [
           { $and: [{ to: user }, { type: "private_message" }] },
           { $and: [{ from: user }, { type: "private_message" }] },
-          { $and: [{ type: "message" }] }
+          { $and: [{ type: "message" }] },
+          { $and: [{ type: "status" }] },
         ],
       })
       .toArray();
@@ -197,7 +198,7 @@ app.delete("/messages/:id", async (req, res) => {
       return res.sendStatus(401);
     }
     await db.collection("messages").deleteOne({ _id: ObjectId(id) });
-    res.sendStatus(201);
+    res.sendStatus(200);
   } catch (error) {
     console.log(error.message);
     res.sendStatus(500);
@@ -224,14 +225,13 @@ app.post("/status", async (req, res) => {
 
 try {
   setInterval(async () => {
-
     let dados = await db.collection("participants").find().toArray();
-    console.log("entrou aqui",dados);
-    dados.forEach(async el=>{
-      let timeNow  = Date.now()
-      let name = el.name
-      if(timeNow - el.lastStatus > 10000){
-        await db.collection("participants").deleteOne({name:name})
+    console.log("entrou aqui", dados);
+    dados.forEach(async (el) => {
+      let timeNow = Date.now();
+      let name = el.name;
+      if (timeNow - el.lastStatus > 10000) {
+        await db.collection("participants").deleteOne({ name: name });
         await db.collection("messages").insertOne({
           from: name,
           to: "Todos",
@@ -240,7 +240,7 @@ try {
           time: dayjs().format("hh:mm:ss"),
         });
       }
-    })
+    });
   }, 15000);
 } catch (error) {
   console.log(error);
