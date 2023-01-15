@@ -3,10 +3,12 @@ import dotenv from "dotenv";
 import { MongoClient, ObjectId } from "mongodb";
 import dayjs from "dayjs";
 import Joi from "joi";
+import cors from "cors";
 
 const app = express();
 dotenv.config();
 app.use(express.json());
+app.use(cors());
 
 const userSchema = Joi.object({
   name: Joi.string().min(3).max(30).required(),
@@ -38,7 +40,10 @@ app.post("/participants", async (req, res) => {
   const { name } = req.body;
 
   try {
-    await userSchema.validateAsync({ name });
+    await userSchema.validateAsync(
+      { name },
+      { pick: ["name"], abortEarly: true }
+    );
 
     const findUser = await db.collection("participants").findOne({ name });
 
@@ -112,14 +117,18 @@ app.get("/messages", async (req, res) => {
   try {
     const findMessages = await db
       .collection("messages")
-      .find({ $or: [{ from: user }, { to: user }, { type: "message" }] })
+      .find({
+        $or: [
+          { $and: [{ to: user }, { type: "private_message" }] },
+          { $and: [{ from: user }, { type: "private_message" }] },
+          { $and: [{ type: "message" }] }
+        ],
+      })
       .toArray();
     console.log(findMessages);
-    if (!findMessages){
-      return res.send(40)
+    if (!findMessages) {
+      return res.sendStatus(404);
     }
-
-
     if (limit) {
       console.log("Está entrando aqui hem");
       return res.status(201).send([...findMessages].reverse().slice(-limit));
@@ -130,23 +139,49 @@ app.get("/messages", async (req, res) => {
   }
 });
 
-app.put(("/messages/:id" async(req,res)=>{
-  const {user} = req.headers
-  const {to,text,type} = req.body
-  const {id} = req.params
-  try{
-    const findUser = await db.collection("participants").findOne({name:user})
+app.put(
+  ("/messages/:id",
+  async (req, res) => {
+    const { user } = req.headers;
+    const { to, text, type } = req.body;
+    const { id } = req.params;
+    try {
+      const findUser = await db
+        .collection("participants")
+        .findOne({ name: user });
+      if (!findUser) {
+        return res.sendStatus(401);
+      }
+      await messageSchema.validateAsync({ to, text, type });
 
-    if(!findUser){
-      return res.sendStatus(401)
+      const findMessage = await db
+        .collection("messages")
+        .findOne({ _id: ObjectId(id) });
+
+      console.log(findMessage);
+
+      if (!findMessage) {
+        return res.status(404).send("Message not found!");
+      }
+      if (findMessage.from !== user) {
+        return res.status(401).send("User not allowed");
+      }
+      await db.collection("messages").updateOne(
+        { _id: ObjectId(id) },
+        {
+          $set: {
+            to,
+            text,
+            type,
+          },
+        }
+      );
+      res.sendStatus(201);
+    } catch (error) {
+      res.sendStatus(500);
     }
-    await messageSchema.validateAsync({to,text,type})
-
-
-  }catch(error){
-    res.send()
-  }
-}))
+  })
+);
 
 app.delete("/messages/:id", async (req, res) => {
   const { id } = req.params;
@@ -164,8 +199,8 @@ app.delete("/messages/:id", async (req, res) => {
     await db.collection("messages").deleteOne({ _id: ObjectId(id) });
     res.sendStatus(201);
   } catch (error) {
-    console.log(error);
-    res.sendStatus(404);
+    console.log(error.message);
+    res.sendStatus(500);
   }
 });
 
@@ -187,29 +222,29 @@ app.post("/status", async (req, res) => {
   }
 });
 
-// try {
-//   setInterval(async () => {
+try {
+  setInterval(async () => {
 
-//     let dados = await db.collection("participants").find().toArray();
-//     console.log("entrou aqui",dados);
-//     dados.forEach(async el=>{
-//       let timeNow  = Date.now()
-//       let name = el.name
-//       if(timeNow - el.lastStatus > 10){
-//         await db.collection("participants").deleteOne({name:name})
-//         await db.collection("messages").insertOne({
-//           from: name,
-//           to: "Todos",
-//           text: "sai na sala...",
-//           type: "status",
-//           time: dayjs().format("hh:mm:ss"),
-//         });
-//       }
-//     })
-//   }, 15000);
-// } catch (error) {
-//   console.log(error);
-// }
+    let dados = await db.collection("participants").find().toArray();
+    console.log("entrou aqui",dados);
+    dados.forEach(async el=>{
+      let timeNow  = Date.now()
+      let name = el.name
+      if(timeNow - el.lastStatus > 10000){
+        await db.collection("participants").deleteOne({name:name})
+        await db.collection("messages").insertOne({
+          from: name,
+          to: "Todos",
+          text: "sai na sala...",
+          type: "status",
+          time: dayjs().format("hh:mm:ss"),
+        });
+      }
+    })
+  }, 15000);
+} catch (error) {
+  console.log(error);
+}
 
 app.listen(5000, () => {
   console.log(`Server running in port 5000`);
