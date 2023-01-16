@@ -127,7 +127,7 @@ app.get("/messages", async (req, res) => {
       return res.sendStatus(404);
     }
     if (limit) {
-      console.log("Limite de mensagens");
+      console.log("Limite de mensagens",limit);
       return res.status(201).send([...findMessages].slice(-limit).reverse());
     }
     res.status(201).send([...findMessages].reverse());
@@ -212,8 +212,8 @@ app.post("/status", async (req, res) => {
   }
 });
 
-try {
-  setInterval(async () => {
+setInterval(async () => {
+  try {
     let dados = await db.collection("participants").find().toArray();
     console.log("Loading data", dados);
     dados.forEach(async (el) => {
@@ -230,10 +230,10 @@ try {
         });
       }
     });
-  }, 15000);
-} catch (error) {
-  console.log(error);
-}
+  } catch (error) {
+    console.log(error)
+  }
+}, 15000);
 
 app.listen(5000, () => {
   console.log(`Server running in port 5000`);
