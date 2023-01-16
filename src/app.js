@@ -105,12 +105,13 @@ app.post("/messages", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
-  const { limit } = req.query;
+  const  limit  = Number(req.query.limit);
   const { user } = req.headers;
 
   if (limit < 1) {
     return res.status(422).send("Limite inválido");
   }
+
   try {
     const findMessages = await db
       .collection("messages")
@@ -123,14 +124,15 @@ app.get("/messages", async (req, res) => {
         ],
       })
       .toArray();
-    if (!findMessages) {
+
+    if (findMessages.length === 0) {
       return res.sendStatus(404);
     }
     if (limit) {
-      console.log("Limite de mensagens",limit);
-      return res.status(201).send([...findMessages].slice(-limit).reverse());
+      console.log("Limite de mensagens", limit);
+      return res.status(201).send([...findMessages].slice(-limit));
     }
-    res.status(201).send([...findMessages].reverse());
+    res.status(201).send([...findMessages]);
   } catch (error) {
     return res.status(422).send(error.message);
   }
@@ -231,7 +233,7 @@ setInterval(async () => {
       }
     });
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 }, 15000);
 
